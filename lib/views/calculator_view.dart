@@ -3,17 +3,23 @@ import 'package:provider/provider.dart';
 
 import '../controllers/calculator_controller.dart';
 
-/// شاشة الحاسبة الأولية لربط الواجهة بالـController
+/// شاشة الحاسبة، وتحتوي على حقول إدخال الرقمين والعمليات والنتيجة.
 class CalculatorView extends StatefulWidget {
-  /// ينشئ شاشة الحاسبة
+  /// ينشئ شاشة الحاسبة.
   const CalculatorView({super.key});
 
-  /// ينشئ الحالة التي تحفظ مدخلات الشاشة
+  /// ينشئ الحالة التي تحتفظ بمتحكمي حقول الإدخال.
   @override
   State<CalculatorView> createState() => _CalculatorViewState();
 }
 
 class _CalculatorViewState extends State<CalculatorView> {
+  final TextEditingController _firstNumberController =
+  TextEditingController();
+
+  final TextEditingController _secondNumberController =
+  TextEditingController();
+
   static const Color _backgroundColor = Color(0xFF111315);
   static const Color _surfaceColor = Color(0xFF1C2023);
   static const Color _borderColor = Color(0xFF343A3D);
@@ -21,18 +27,9 @@ class _CalculatorViewState extends State<CalculatorView> {
   static const Color _neonGreenColor = Color(0xFFC6FF00);
   static const Color _mutedColor = Color(0xFF9BA3A8);
 
-  final TextEditingController _firstNumberController =
-  TextEditingController();
-  final TextEditingController _secondNumberController =
-  TextEditingController();
-
-  String? _selectedOperation;
-
-  /// يحدد العملية الحسابية التي اختارها المستخدم
+  /// يرسل العملية المختارة إلى الـController
   void _selectOperation(String operation) {
-    setState(() {
-      _selectedOperation = operation;
-    });
+    context.read<CalculatorController>().selectOperation(operation);
   }
 
   /// ينشئ حقلًا منسقًا لإدخال أحد الرقمين
@@ -94,10 +91,11 @@ class _CalculatorViewState extends State<CalculatorView> {
     );
   }
 
-  /// ينشئ زر العملية ويبرزها عند اختيارها
-  Widget _buildOperationButton(String operation) {
-    final isSelected = _selectedOperation == operation;
-
+  /// ينشئ زر عملية ويبرزها إذا كانت هي العملية المختارة
+  Widget _buildOperationButton(
+      String operation, {
+        required bool isSelected,
+      }) {
     return Expanded(
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -142,37 +140,21 @@ class _CalculatorViewState extends State<CalculatorView> {
     );
   }
 
-  /// يتحقق من اختيار العملية ثم يطلب من الـController حساب الناتج
+  /// يرسل الرقمين إلى الـController لتنفيذ العملية الحسابية
   void _calculate() {
-    final operation = _selectedOperation;
-
-    if (operation == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an operation first'),
-        ),
-      );
-      return;
-    }
-
     context.read<CalculatorController>().calculate(
       firstNumber: _firstNumberController.text,
       secondNumber: _secondNumberController.text,
-      operation: operation,
     );
   }
 
-  /// يمسح الرقمين والعملية والناتج
+  /// يمسح الرقمين وحالة الحاسبة الموجودة في الـProvider
   void _clear() {
     _firstNumberController.clear();
     _secondNumberController.clear();
-
-    setState(() {
-      _selectedOperation = null;
-    });
-
     context.read<CalculatorController>().clear();
   }
+
   /// يتخلص من متحكمي حقول الإدخال عند إغلاق الشاشة
   @override
   void dispose() {
@@ -181,12 +163,9 @@ class _CalculatorViewState extends State<CalculatorView> {
     super.dispose();
   }
 
-  /// يبني الواجهة الأولية للحاسبة
-  /// يبني شاشة الحاسبة بتصميم داكن ولمسات برتقالية وخضراء
+  /// يبني واجهة الحاسبة
   @override
   Widget build(BuildContext context) {
-    final calculatorController = context.watch<CalculatorController>();
-
     return Scaffold(
       backgroundColor: _backgroundColor,
       body: SafeArea(
@@ -339,33 +318,59 @@ class _CalculatorViewState extends State<CalculatorView> {
                               letterSpacing: 1.1,
                             ),
                           ),
-                          Text(
-                            _selectedOperation == null
-                                ? 'CHOOSE ONE'
-                                : 'SELECTED: $_selectedOperation',
-                            style: TextStyle(
-                              color: _selectedOperation == null
-                                  ? _mutedColor
-                                  : _orangeColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                            ),
+                          Consumer<CalculatorController>(
+                            builder: (context, controller, child) {
+                              final selectedOperation =
+                                  controller.selectedOperation;
+
+                              return Text(
+                                selectedOperation == null
+                                    ? 'CHOOSE ONE'
+                                    : 'SELECTED: $selectedOperation',
+                                style: TextStyle(
+                                  color: selectedOperation == null
+                                      ? _mutedColor
+                                      : _orangeColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
 
-                      Row(
-                        children: [
-                          _buildOperationButton('+'),
-                          const SizedBox(width: 9),
-                          _buildOperationButton('-'),
-                          const SizedBox(width: 9),
-                          _buildOperationButton('×'),
-                          const SizedBox(width: 9),
-                          _buildOperationButton('÷'),
-                        ],
+                      Consumer<CalculatorController>(
+                        builder: (context, controller, child) {
+                          final selectedOperation =
+                              controller.selectedOperation;
+
+                          return Row(
+                            children: [
+                              _buildOperationButton(
+                                '+',
+                                isSelected: selectedOperation == '+',
+                              ),
+                              const SizedBox(width: 9),
+                              _buildOperationButton(
+                                '-',
+                                isSelected: selectedOperation == '-',
+                              ),
+                              const SizedBox(width: 9),
+                              _buildOperationButton(
+                                '×',
+                                isSelected: selectedOperation == '×',
+                              ),
+                              const SizedBox(width: 9),
+                              _buildOperationButton(
+                                '÷',
+                                isSelected: selectedOperation == '÷',
+                              ),
+                            ],
+                          );
+                        },
                       ),
 
                       const SizedBox(height: 25),
@@ -381,7 +386,9 @@ class _CalculatorViewState extends State<CalculatorView> {
                                   padding: EdgeInsets.zero,
                                   foregroundColor: Colors.white,
                                   backgroundColor: _surfaceColor,
-                                  side: const BorderSide(color: _borderColor),
+                                  side: const BorderSide(
+                                    color: _borderColor,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -451,90 +458,95 @@ class _CalculatorViewState extends State<CalculatorView> {
 
                       const SizedBox(height: 24),
 
-                      Container(
-                        padding: const EdgeInsets.all(21),
-                        decoration: BoxDecoration(
-                          color: _surfaceColor,
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: _borderColor),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x33000000),
-                              blurRadius: 24,
-                              offset: Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: _orangeColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 9),
-                                const Text(
-                                  'RESULT',
-                                  style: TextStyle(
-                                    color: _mutedColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 1.3,
-                                  ),
-                                ),
-                                const Spacer(),
-                                const Icon(
-                                  Icons.bolt_rounded,
-                                  color: _neonGreenColor,
-                                  size: 20,
+                      Consumer<CalculatorController>(
+                        builder: (context, controller, child) {
+                          return Container(
+                            padding: const EdgeInsets.all(21),
+                            decoration: BoxDecoration(
+                              color: _surfaceColor,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: _borderColor),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x33000000),
+                                  blurRadius: 24,
+                                  offset: Offset(0, 10),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 18),
-                            Text(
-                              calculatorController.result,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: _neonGreenColor,
-                                fontSize: 44,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -1.2,
-                              ),
-                            ),
-                            if (calculatorController.errorMessage != null) ...[
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.error_outline_rounded,
-                                    color: Color(0xFFFF7676),
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 7),
-                                  Expanded(
-                                    child: Text(
-                                      calculatorController.errorMessage!,
-                                      style: const TextStyle(
-                                        color: Color(0xFFFF7676),
-                                        fontSize: 12,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: _orangeColor,
+                                        shape: BoxShape.circle,
                                       ),
                                     ),
+                                    const SizedBox(width: 9),
+                                    const Text(
+                                      'RESULT',
+                                      style: TextStyle(
+                                        color: _mutedColor,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 1.3,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    const Icon(
+                                      Icons.bolt_rounded,
+                                      color: _neonGreenColor,
+                                      size: 20,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 18),
+                                Text(
+                                  controller.result,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: _neonGreenColor,
+                                    fontSize: 44,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -1.2,
+                                  ),
+                                ),
+                                if (controller.errorMessage != null) ...[
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.error_outline_rounded,
+                                        color: Color(0xFFFF7676),
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 7),
+                                      Expanded(
+                                        child: Text(
+                                          controller.errorMessage!,
+                                          style: const TextStyle(
+                                            color: Color(0xFFFF7676),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
-                              ),
-                            ],
-                          ],
-                        ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
 
                       const SizedBox(height: 20),
+
                       const Center(
                         child: Text(
                           'FAST • SIMPLE • RELIABLE',
